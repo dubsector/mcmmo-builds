@@ -56,7 +56,7 @@ jobs:
         run: echo "version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_OUTPUT
 
       - name: Rename JAR
-        run: mv target/mcMMO-${{ steps.ver.outputs.version }}.jar target/mcMMO-${{ steps.ver.outputs.version }}+${{ needs.check.outputs.short_sha }}.jar
+        run: mv target/mcMMO.jar target/mcMMO-${{ steps.ver.outputs.version }}+${{ needs.check.outputs.short_sha }}.jar
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
