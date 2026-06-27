@@ -36,15 +36,13 @@ jobs:
             echo "should_build=true" >> $GITHUB_OUTPUT
           fi
 
-          SPIGOT_VER=$(curl -fsSL https://raw.githubusercontent.com/mcMMO-Dev/mcMMO/master/pom.xml | grep -oP '(?<=<spigot\.version>)[^<]+' | head -1)
-          MC_VERSION=$(echo "$SPIGOT_VER" | grep -oP '^\d+\.\d+(\.\d+)?')
+          MC_VERSION=$(curl -fsSL https://raw.githubusercontent.com/mcMMO-Dev/mcMMO/master/pom.xml | python3 -c "import sys,re; c=sys.stdin.read(); c=re.sub(r'<!--.*?-->','',c,flags=re.DOTALL); m=re.search(r'<spigot\.version>([^<]+)</spigot\.version>',c); v=m.group(1) if m else ''; mc=re.match(r'\d+\.\d+(\.\d+)?',v); print(mc.group(0) if mc else '')")
           echo "mc_version=$MC_VERSION" >> $GITHUB_OUTPUT
 
-          UA="mcmmo-builds-CI/1.0 (https://github.com/dubsector/mcmmo-builds)"
-          LATEST_PAPER=$(curl -fsSL -H "User-Agent: ${UA}" "https://fill.papermc.io/v3/projects/paper" | python3 -c "import sys,json; d=json.load(sys.stdin); v=d.get('versions',{}); g=list(v.keys()); latest=v[g[0]] if g else []; stable=[x for x in latest if not any(s in x.lower() for s in ['pre','rc','alpha','beta'])]; print((stable or latest or [''])[0])")
+          LATEST_PAPER=$(curl -fsSL "https://api.papermc.io/v2/projects/paper" | python3 -c "import sys,json; vs=json.load(sys.stdin)['versions']; print(vs[-1])")
           echo "latest_paper=$LATEST_PAPER" >> $GITHUB_OUTPUT
 
-          LATEST_FOLIA=$(curl -fsSL -H "User-Agent: ${UA}" "https://fill.papermc.io/v3/projects/folia" | python3 -c "import sys,json; d=json.load(sys.stdin); v=d.get('versions',{}); g=list(v.keys()); latest=v[g[0]] if g else []; stable=[x for x in latest if not any(s in x.lower() for s in ['pre','rc','alpha','beta'])]; print((stable or latest or [''])[0])")
+          LATEST_FOLIA=$(curl -fsSL "https://api.papermc.io/v2/projects/folia" | python3 -c "import sys,json; vs=json.load(sys.stdin)['versions']; print(vs[-1])")
           echo "latest_folia=$LATEST_FOLIA" >> $GITHUB_OUTPUT
 
   build:
@@ -94,10 +92,10 @@ jobs:
     permissions:
       actions: write
     steps:
-      - name: Set up JDK 21
+      - name: Set up JDK 25
         uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5
         with:
-          java-version: '21'
+          java-version: '25'
           distribution: 'temurin'
 
       - name: Download built JAR
@@ -106,83 +104,74 @@ jobs:
           name: plugin-jar
           path: plugin-jar/
 
-      - name: Resolve Paper build
+      - name: Resolve latest Paper build
         id: paper
-        env:
-          MC_VERSION: ${{ needs.check.outputs.mc_version }}
         run: |
-          set -euo pipefail
-          UA="mcmmo-builds-CI/1.0 (https://github.com/dubsector/mcmmo-builds)"
-          BUILDS=$(curl -fsSL -H "User-Agent: ${UA}" "https://fill.papermc.io/v3/projects/paper/versions/${MC_VERSION}/builds" 2>/dev/null || echo "[]")
-          BUILD_COUNT=$(echo "$BUILDS" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
-          if [ "$BUILD_COUNT" = "0" ]; then
-            echo "::warning::No Paper ${MC_VERSION} builds available - smoke test skipped"
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "Found ${BUILD_COUNT} Paper ${MC_VERSION} build(s)"
-          echo "$BUILDS" | python3 -c "
-          import sys, json
-          builds = json.load(sys.stdin)
-          stable = [b for b in builds if b.get('channel','').upper() == 'STABLE']
-          chosen = sorted((stable or builds), key=lambda b: b['id'])[-1]
-          d = chosen['downloads']['server:default']
-          sys.stdout.write('build=' + str(chosen['id']) + chr(10))
-          sys.stdout.write('jar_name=' + d['name'] + chr(10))
-          sys.stdout.write('download_url=' + d['url'] + chr(10))
-          " >> "$GITHUB_OUTPUT"
-          echo "available=true" >> "$GITHUB_OUTPUT"
+          MC_VERSION=$(curl -fsSL "https://api.papermc.io/v2/projects/paper" | python3 -c "import sys,json; vs=json.load(sys.stdin)['versions']; print(vs[-1])")
+          BUILD=$(curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds" | python3 -c "import sys,json; builds=json.load(sys.stdin)['builds']; print(builds[-1]['build'])")
+          JAR_NAME=$(curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds/${BUILD}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['downloads']['application']['name'])")
+          echo "mc_version=${MC_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "build=${BUILD}"           >> "$GITHUB_OUTPUT"
+          echo "jar_name=${JAR_NAME}"     >> "$GITHUB_OUTPUT"
+          echo "Resolved: Paper ${MC_VERSION} build ${BUILD} (${JAR_NAME})"
 
       - name: Download Paper server JAR
-        if: steps.paper.outputs.available == 'true'
         env:
-          DOWNLOAD_URL: ${{ steps.paper.outputs.download_url }}
+          MC_VERSION: ${{ steps.paper.outputs.mc_version }}
+          BUILD: ${{ steps.paper.outputs.build }}
+          JAR_NAME: ${{ steps.paper.outputs.jar_name }}
         run: |
           mkdir -p smoke-server/plugins
-          curl -fsSL -H "User-Agent: mcmmo-builds-CI/1.0 (https://github.com/dubsector/mcmmo-builds)" "${DOWNLOAD_URL}" -o smoke-server/paper.jar
+          curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds/${BUILD}/downloads/${JAR_NAME}" -o smoke-server/paper.jar
 
       - name: Copy plugin JAR
-        if: steps.paper.outputs.available == 'true'
         run: cp plugin-jar/mcMMO-*.jar smoke-server/plugins/mcMMO.jar
 
-      - name: Accept EULA
-        if: steps.paper.outputs.available == 'true'
-        run: echo "eula=true" > smoke-server/eula.txt
+      - name: Configure server
+        run: |
+          echo "eula=true" > smoke-server/eula.txt
+          printf '%s\n' "online-mode=false" "level-type=flat" "generate-structures=false" "max-players=0" > smoke-server/server.properties
 
-      - name: Start Paper server and verify plugin loads
-        if: steps.paper.outputs.available == 'true'
-        timeout-minutes: 3
+      - name: Run server and wait for ready
         run: |
           cd smoke-server
-          java -Xmx512m -jar paper.jar --nogui > server.log 2>&1 &
+          java -Xms512m -Xmx1g -jar paper.jar --nogui > server.log 2>&1 &
           SERVER_PID=$!
-          for i in $(seq 1 60); do
-            sleep 2
-            if grep -q "Done" server.log 2>/dev/null; then
-              echo "Server ready"
-              break
+          ELAPSED=0
+          while [ $ELAPSED -lt 120 ]; do
+            sleep 2; ELAPSED=$((ELAPSED + 2))
+            if grep -q "Done (" server.log 2>/dev/null; then
+              echo "Server ready after ${ELAPSED}s"; break
+            fi
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "Server process exited after ${ELAPSED}s"; break
             fi
           done
           kill $SERVER_PID 2>/dev/null || true
           wait $SERVER_PID 2>/dev/null || true
-          if ! grep -q "Done" server.log; then
-            cat server.log
+
+      - name: Assert no mcMMO errors
+        run: |
+          LOG=smoke-server/server.log
+          if grep -qiE "SEVERE.*mcMMO|Could not load.*mcMMO|Error.*mcMMO|mcMMO.*FAILED" "$LOG"; then
+            echo "::error::mcMMO logged errors on Paper startup:"
+            grep -iE "SEVERE.*mcMMO|Could not load.*mcMMO|Error.*mcMMO|mcMMO.*FAILED" "$LOG"
+            exit 1
+          fi
+          if ! grep -q "Done (" "$LOG"; then
+            cat "$LOG"
             echo "::error::Server did not reach ready state"
             exit 1
           fi
-          if grep -qi "error\|exception\|failed to load\|Could not load" server.log; then
-            grep -i "error\|exception\|failed to load\|Could not load" server.log
-            echo "::error::Plugin errors detected in server log"
-            exit 1
-          fi
-          echo "Smoke test passed"
+          echo "Paper smoke test passed"
 
-      - name: Upload server log on failure
-        if: failure()
+      - name: Upload server log
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: paper-smoke-log
           path: smoke-server/server.log
+          retention-days: 7
 
   folia-smoke-test:
     name: Folia Smoke Test
@@ -191,10 +180,10 @@ jobs:
     permissions:
       actions: write
     steps:
-      - name: Set up JDK 21
+      - name: Set up JDK 25
         uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5
         with:
-          java-version: '21'
+          java-version: '25'
           distribution: 'temurin'
 
       - name: Download built JAR
@@ -203,83 +192,74 @@ jobs:
           name: plugin-jar
           path: plugin-jar/
 
-      - name: Resolve Folia build
+      - name: Resolve latest Folia build
         id: folia
-        env:
-          MC_VERSION: ${{ needs.check.outputs.mc_version }}
         run: |
-          set -euo pipefail
-          UA="mcmmo-builds-CI/1.0 (https://github.com/dubsector/mcmmo-builds)"
-          BUILDS=$(curl -fsSL -H "User-Agent: ${UA}" "https://fill.papermc.io/v3/projects/folia/versions/${MC_VERSION}/builds" 2>/dev/null || echo "[]")
-          BUILD_COUNT=$(echo "$BUILDS" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
-          if [ "$BUILD_COUNT" = "0" ]; then
-            echo "::warning::No Folia ${MC_VERSION} builds available - smoke test skipped"
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "Found ${BUILD_COUNT} Folia ${MC_VERSION} build(s)"
-          echo "$BUILDS" | python3 -c "
-          import sys, json
-          builds = json.load(sys.stdin)
-          stable = [b for b in builds if b.get('channel','').upper() == 'STABLE']
-          chosen = sorted((stable or builds), key=lambda b: b['id'])[-1]
-          d = chosen['downloads']['server:default']
-          sys.stdout.write('build=' + str(chosen['id']) + chr(10))
-          sys.stdout.write('jar_name=' + d['name'] + chr(10))
-          sys.stdout.write('download_url=' + d['url'] + chr(10))
-          " >> "$GITHUB_OUTPUT"
-          echo "available=true" >> "$GITHUB_OUTPUT"
+          MC_VERSION=$(curl -fsSL "https://api.papermc.io/v2/projects/folia" | python3 -c "import sys,json; vs=json.load(sys.stdin)['versions']; print(vs[-1])")
+          BUILD=$(curl -fsSL "https://api.papermc.io/v2/projects/folia/versions/${MC_VERSION}/builds" | python3 -c "import sys,json; builds=json.load(sys.stdin)['builds']; print(builds[-1]['build'])")
+          JAR_NAME=$(curl -fsSL "https://api.papermc.io/v2/projects/folia/versions/${MC_VERSION}/builds/${BUILD}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['downloads']['application']['name'])")
+          echo "mc_version=${MC_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "build=${BUILD}"           >> "$GITHUB_OUTPUT"
+          echo "jar_name=${JAR_NAME}"     >> "$GITHUB_OUTPUT"
+          echo "Resolved: Folia ${MC_VERSION} build ${BUILD} (${JAR_NAME})"
 
       - name: Download Folia server JAR
-        if: steps.folia.outputs.available == 'true'
         env:
-          DOWNLOAD_URL: ${{ steps.folia.outputs.download_url }}
+          MC_VERSION: ${{ steps.folia.outputs.mc_version }}
+          BUILD: ${{ steps.folia.outputs.build }}
+          JAR_NAME: ${{ steps.folia.outputs.jar_name }}
         run: |
           mkdir -p smoke-server/plugins
-          curl -fsSL -H "User-Agent: mcmmo-builds-CI/1.0 (https://github.com/dubsector/mcmmo-builds)" "${DOWNLOAD_URL}" -o smoke-server/folia.jar
+          curl -fsSL "https://api.papermc.io/v2/projects/folia/versions/${MC_VERSION}/builds/${BUILD}/downloads/${JAR_NAME}" -o smoke-server/folia.jar
 
       - name: Copy plugin JAR
-        if: steps.folia.outputs.available == 'true'
         run: cp plugin-jar/mcMMO-*.jar smoke-server/plugins/mcMMO.jar
 
-      - name: Accept EULA
-        if: steps.folia.outputs.available == 'true'
-        run: echo "eula=true" > smoke-server/eula.txt
+      - name: Configure server
+        run: |
+          echo "eula=true" > smoke-server/eula.txt
+          printf '%s\n' "online-mode=false" "level-type=flat" "generate-structures=false" "max-players=0" > smoke-server/server.properties
 
-      - name: Start Folia server and verify plugin loads
-        if: steps.folia.outputs.available == 'true'
-        timeout-minutes: 3
+      - name: Run server and wait for ready
         run: |
           cd smoke-server
-          java -Xmx512m -jar folia.jar --nogui > server.log 2>&1 &
+          java -Xms512m -Xmx1g -jar folia.jar --nogui > server.log 2>&1 &
           SERVER_PID=$!
-          for i in $(seq 1 60); do
-            sleep 2
-            if grep -q "Done" server.log 2>/dev/null; then
-              echo "Server ready"
-              break
+          ELAPSED=0
+          while [ $ELAPSED -lt 120 ]; do
+            sleep 2; ELAPSED=$((ELAPSED + 2))
+            if grep -q "Done (" server.log 2>/dev/null; then
+              echo "Server ready after ${ELAPSED}s"; break
+            fi
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "Server process exited after ${ELAPSED}s"; break
             fi
           done
           kill $SERVER_PID 2>/dev/null || true
           wait $SERVER_PID 2>/dev/null || true
-          if ! grep -q "Done" server.log; then
-            cat server.log
+
+      - name: Assert no mcMMO errors
+        run: |
+          LOG=smoke-server/server.log
+          if grep -qiE "SEVERE.*mcMMO|Could not load.*mcMMO|Error.*mcMMO|mcMMO.*FAILED" "$LOG"; then
+            echo "::error::mcMMO logged errors on Folia startup:"
+            grep -iE "SEVERE.*mcMMO|Could not load.*mcMMO|Error.*mcMMO|mcMMO.*FAILED" "$LOG"
+            exit 1
+          fi
+          if ! grep -q "Done (" "$LOG"; then
+            cat "$LOG"
             echo "::error::Server did not reach ready state"
             exit 1
           fi
-          if grep -qi "error\|exception\|failed to load\|Could not load" server.log; then
-            grep -i "error\|exception\|failed to load\|Could not load" server.log
-            echo "::error::Plugin errors detected in server log"
-            exit 1
-          fi
-          echo "Smoke test passed"
+          echo "Folia smoke test passed"
 
-      - name: Upload server log on failure
-        if: failure()
+      - name: Upload server log
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: folia-smoke-log
           path: smoke-server/server.log
+          retention-days: 7
 
   publish:
     name: Publish Release
