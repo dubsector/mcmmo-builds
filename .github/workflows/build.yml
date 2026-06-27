@@ -86,7 +86,7 @@ jobs:
         run: mv target/mcMMO.jar "target/mcMMO-${VERSION}+${SHORT_SHA}.jar"
 
       - name: Upload plugin artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: plugin-jar
           path: target/mcMMO-*.jar
@@ -99,7 +99,7 @@ jobs:
       actions: write
     steps:
       - name: Download built JAR
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: plugin-jar
           path: plugin-jar/
@@ -108,7 +108,7 @@ jobs:
         id: paper
         run: |
           MC_VERSION=$(curl -fsSL "https://api.papermc.io/v2/projects/paper" | python3 -c "import sys,json; vs=json.load(sys.stdin)['versions']; print(vs[-1])")
-          BUILD=$(curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds" | python3 -c "import sys,json; builds=json.load(sys.stdin)['builds']; print(builds[-1]['build'])")
+          BUILD=$(curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds" | python3 -c "import sys,json; builds=json.load(sys.stdin)['builds']; stable=[b for b in builds if b.get('channel','')=='default']; chosen=(stable or builds)[-1]; print(chosen['build'])")
           JAR_NAME=$(curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds/${BUILD}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['downloads']['application']['name'])")
           echo "mc_version=${MC_VERSION}" >> "$GITHUB_OUTPUT"
           echo "build=${BUILD}"           >> "$GITHUB_OUTPUT"
@@ -127,7 +127,7 @@ jobs:
       - name: Detect required Java version
         id: java_ver
         run: |
-          REQUIRED=$(unzip -p smoke-server/paper.jar org/bukkit/craftbukkit/Main.class 2>/dev/null | python3 -c "import sys; d=sys.stdin.buffer.read(); print(int.from_bytes(d[6:8],'big') - 44)" 2>/dev/null || echo "17")
+          REQUIRED=$(unzip -p smoke-server/paper.jar org/bukkit/craftbukkit/Main.class 2>/dev/null | python3 -c "import sys; d=sys.stdin.buffer.read(); v=int.from_bytes(d[6:8],'big')-44 if len(d)>=8 else 0; print(v if v>=8 else 17)" 2>/dev/null || echo "17")
           echo "Detected required Java: ${REQUIRED}"
           echo "version=${REQUIRED}" >> "$GITHUB_OUTPUT"
 
@@ -180,7 +180,7 @@ jobs:
 
       - name: Upload server log
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: paper-smoke-log
           path: smoke-server/server.log
@@ -194,7 +194,7 @@ jobs:
       actions: write
     steps:
       - name: Download built JAR
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: plugin-jar
           path: plugin-jar/
@@ -203,7 +203,7 @@ jobs:
         id: folia
         run: |
           MC_VERSION=$(curl -fsSL "https://api.papermc.io/v2/projects/folia" | python3 -c "import sys,json; vs=json.load(sys.stdin)['versions']; print(vs[-1])")
-          BUILD=$(curl -fsSL "https://api.papermc.io/v2/projects/folia/versions/${MC_VERSION}/builds" | python3 -c "import sys,json; builds=json.load(sys.stdin)['builds']; print(builds[-1]['build'])")
+          BUILD=$(curl -fsSL "https://api.papermc.io/v2/projects/folia/versions/${MC_VERSION}/builds" | python3 -c "import sys,json; builds=json.load(sys.stdin)['builds']; stable=[b for b in builds if b.get('channel','')=='default']; chosen=(stable or builds)[-1]; print(chosen['build'])")
           JAR_NAME=$(curl -fsSL "https://api.papermc.io/v2/projects/folia/versions/${MC_VERSION}/builds/${BUILD}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['downloads']['application']['name'])")
           echo "mc_version=${MC_VERSION}" >> "$GITHUB_OUTPUT"
           echo "build=${BUILD}"           >> "$GITHUB_OUTPUT"
@@ -222,7 +222,7 @@ jobs:
       - name: Detect required Java version
         id: java_ver
         run: |
-          REQUIRED=$(unzip -p smoke-server/folia.jar org/bukkit/craftbukkit/Main.class 2>/dev/null | python3 -c "import sys; d=sys.stdin.buffer.read(); print(int.from_bytes(d[6:8],'big') - 44)" 2>/dev/null || echo "17")
+          REQUIRED=$(unzip -p smoke-server/folia.jar org/bukkit/craftbukkit/Main.class 2>/dev/null | python3 -c "import sys; d=sys.stdin.buffer.read(); v=int.from_bytes(d[6:8],'big')-44 if len(d)>=8 else 0; print(v if v>=8 else 17)" 2>/dev/null || echo "17")
           echo "Detected required Java: ${REQUIRED}"
           echo "version=${REQUIRED}" >> "$GITHUB_OUTPUT"
 
@@ -275,7 +275,7 @@ jobs:
 
       - name: Upload server log
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: folia-smoke-log
           path: smoke-server/server.log
@@ -290,7 +290,7 @@ jobs:
       actions: read
     steps:
       - name: Download plugin artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: plugin-jar
           path: plugin-jar/
