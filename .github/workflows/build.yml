@@ -5,9 +5,13 @@ on:
   schedule:
     - cron: '0 6 * * *'
 
+permissions: {}
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       should_build: ${{ steps.check.outputs.should_build }}
       sha: ${{ steps.check.outputs.sha }}
@@ -37,16 +41,16 @@ jobs:
       contents: write
     steps:
       - name: Checkout mcMMO
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           repository: mcMMO-Dev/mcMMO
+          persist-credentials: false
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: maven
 
       - name: Build
         run: mvn clean package -DskipTests -q
@@ -56,14 +60,19 @@ jobs:
         run: echo "version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_OUTPUT
 
       - name: Rename JAR
-        run: mv target/mcMMO.jar target/mcMMO-${{ steps.ver.outputs.version }}+${{ needs.check.outputs.short_sha }}.jar
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          SHORT_SHA: ${{ needs.check.outputs.short_sha }}
+        run: mv target/mcMMO.jar "target/mcMMO-${VERSION}+${SHORT_SHA}.jar"
 
       - name: Publish release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: build-${{ needs.check.outputs.short_sha }}
-          name: mcMMO ${{ steps.ver.outputs.version }} (${{ needs.check.outputs.short_sha }})
-          prerelease: false
-          body: |
-            Built from upstream master @ `${{ needs.check.outputs.sha }}`
-          files: target/mcMMO-*.jar
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ needs.check.outputs.sha }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          SHORT_SHA: ${{ needs.check.outputs.short_sha }}
+        run: |
+          gh release create "build-${SHORT_SHA}" \
+            --title "mcMMO ${VERSION} (${SHORT_SHA})" \
+            --notes "Built from upstream master @ \`${SHA}\`" \
+            target/mcMMO-*.jar
