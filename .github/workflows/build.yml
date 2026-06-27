@@ -126,9 +126,17 @@ jobs:
 
       - name: Detect required Java version
         id: java_ver
+        env:
+          MC_VERSION: ${{ steps.paper.outputs.mc_version }}
         run: |
-          REQUIRED=$(unzip -p smoke-server/paper.jar org/bukkit/craftbukkit/Main.class 2>/dev/null | python3 -c "import sys; d=sys.stdin.buffer.read(); v=int.from_bytes(d[6:8],'big')-44 if len(d)>=8 else 0; print(v if v>=8 else 17)" 2>/dev/null || echo "17")
-          echo "Detected required Java: ${REQUIRED}"
+          REQUIRED=$(python3 -c "
+          import re, os
+          v = os.environ.get('MC_VERSION', '1.21')
+          parts = [int(x) for x in re.split(r'\.', v) if x.isdigit()]
+          major, minor = (parts + [0, 0])[:2]
+          print(21 if major >= 25 or (major == 1 and minor >= 21) else 17 if major == 1 and minor >= 17 else 11)
+          ")
+          echo "MC ${MC_VERSION} -> Java ${REQUIRED}"
           echo "version=${REQUIRED}" >> "$GITHUB_OUTPUT"
 
       - name: Set up required JDK
@@ -221,9 +229,17 @@ jobs:
 
       - name: Detect required Java version
         id: java_ver
+        env:
+          MC_VERSION: ${{ steps.folia.outputs.mc_version }}
         run: |
-          REQUIRED=$(unzip -p smoke-server/folia.jar org/bukkit/craftbukkit/Main.class 2>/dev/null | python3 -c "import sys; d=sys.stdin.buffer.read(); v=int.from_bytes(d[6:8],'big')-44 if len(d)>=8 else 0; print(v if v>=8 else 17)" 2>/dev/null || echo "17")
-          echo "Detected required Java: ${REQUIRED}"
+          REQUIRED=$(python3 -c "
+          import re, os
+          v = os.environ.get('MC_VERSION', '1.21')
+          parts = [int(x) for x in re.split(r'\.', v) if x.isdigit()]
+          major, minor = (parts + [0, 0])[:2]
+          print(21 if major >= 25 or (major == 1 and minor >= 21) else 17 if major == 1 and minor >= 17 else 11)
+          ")
+          echo "MC ${MC_VERSION} -> Java ${REQUIRED}"
           echo "version=${REQUIRED}" >> "$GITHUB_OUTPUT"
 
       - name: Set up required JDK
