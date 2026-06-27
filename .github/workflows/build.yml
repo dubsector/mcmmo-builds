@@ -17,6 +17,7 @@ jobs:
       sha: ${{ steps.check.outputs.sha }}
       short_sha: ${{ steps.check.outputs.short_sha }}
       mc_version: ${{ steps.check.outputs.mc_version }}
+      java_version: ${{ steps.check.outputs.java_version }}
       latest_paper: ${{ steps.check.outputs.latest_paper }}
       latest_folia: ${{ steps.check.outputs.latest_folia }}
     steps:
@@ -36,8 +37,13 @@ jobs:
             echo "should_build=true" >> $GITHUB_OUTPUT
           fi
 
-          MC_VERSION=$(curl -fsSL https://raw.githubusercontent.com/mcMMO-Dev/mcMMO/master/pom.xml | python3 -c "import sys,re; c=sys.stdin.read(); c=re.sub(r'<!--.*?-->','',c,flags=re.DOTALL); m=re.search(r'<spigot\.version>([^<]+)</spigot\.version>',c); v=m.group(1) if m else ''; mc=re.match(r'\d+\.\d+(\.\d+)?',v); print(mc.group(0) if mc else '')")
+          POM=$(curl -fsSL https://raw.githubusercontent.com/mcMMO-Dev/mcMMO/master/pom.xml | python3 -c "import sys,re; c=sys.stdin.read(); print(re.sub(r'<!--.*?-->','',c,flags=re.DOTALL))")
+
+          MC_VERSION=$(echo "$POM" | python3 -c "import sys,re; c=sys.stdin.read(); m=re.search(r'<spigot\.version>([^<]+)</spigot\.version>',c); v=m.group(1) if m else ''; mc=re.match(r'\d+\.\d+(\.\d+)?',v); print(mc.group(0) if mc else '')")
           echo "mc_version=$MC_VERSION" >> $GITHUB_OUTPUT
+
+          JAVA_VERSION=$(echo "$POM" | python3 -c "import sys,re; c=sys.stdin.read(); m=re.search(r'<java\.version>([^<]+)</java\.version>',c); print(m.group(1).strip() if m else '17')")
+          echo "java_version=$JAVA_VERSION" >> $GITHUB_OUTPUT
 
           LATEST_PAPER=$(curl -fsSL "https://api.papermc.io/v2/projects/paper" | python3 -c "import sys,json; vs=json.load(sys.stdin)['versions']; print(vs[-1])")
           echo "latest_paper=$LATEST_PAPER" >> $GITHUB_OUTPUT
@@ -60,10 +66,10 @@ jobs:
           repository: mcMMO-Dev/mcMMO
           persist-credentials: false
 
-      - name: Set up JDK 17
+      - name: Set up JDK
         uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5
         with:
-          java-version: '17'
+          java-version: ${{ needs.check.outputs.java_version }}
           distribution: 'temurin'
 
       - name: Build
