@@ -73,6 +73,7 @@ jobs:
           SHORT_SHA: ${{ needs.check.outputs.short_sha }}
         run: |
           gh release create "build-${SHORT_SHA}" \
+            --repo ${{ github.repository }} \
             --title "mcMMO ${VERSION} (${SHORT_SHA})" \
             --notes "Built from upstream master @ \`${SHA}\`" \
             target/mcMMO-*.jar
