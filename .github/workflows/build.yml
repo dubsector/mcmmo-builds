@@ -41,10 +41,10 @@ jobs:
           echo "mc_version=$MC_VERSION" >> $GITHUB_OUTPUT
 
           UA="mcmmo-builds-CI/1.0 (https://github.com/dubsector/mcmmo-builds)"
-          LATEST_PAPER=$(curl -fsSL -H "User-Agent: ${UA}" "https://fill.papermc.io/v3/projects/paper" | python3 -c "import sys,json; d=json.load(sys.stdin); v=d.get('versions',[]); print(v[-1] if v else '')")
+          LATEST_PAPER=$(curl -fsSL -H "User-Agent: ${UA}" "https://fill.papermc.io/v3/projects/paper" | python3 -c "import sys,json; d=json.load(sys.stdin); v=d.get('versions',{}); g=list(v.keys()); latest=v[g[0]] if g else []; stable=[x for x in latest if not any(s in x.lower() for s in ['pre','rc','alpha','beta'])]; print((stable or latest or [''])[0])")
           echo "latest_paper=$LATEST_PAPER" >> $GITHUB_OUTPUT
 
-          LATEST_FOLIA=$(curl -fsSL -H "User-Agent: ${UA}" "https://fill.papermc.io/v3/projects/folia" | python3 -c "import sys,json; d=json.load(sys.stdin); v=d.get('versions',[]); print(v[-1] if v else '')")
+          LATEST_FOLIA=$(curl -fsSL -H "User-Agent: ${UA}" "https://fill.papermc.io/v3/projects/folia" | python3 -c "import sys,json; d=json.load(sys.stdin); v=d.get('versions',{}); g=list(v.keys()); latest=v[g[0]] if g else []; stable=[x for x in latest if not any(s in x.lower() for s in ['pre','rc','alpha','beta'])]; print((stable or latest or [''])[0])")
           echo "latest_folia=$LATEST_FOLIA" >> $GITHUB_OUTPUT
 
   build:
