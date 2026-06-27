@@ -16,6 +16,7 @@ jobs:
       should_build: ${{ steps.check.outputs.should_build }}
       sha: ${{ steps.check.outputs.sha }}
       short_sha: ${{ steps.check.outputs.short_sha }}
+      mc_version: ${{ steps.check.outputs.mc_version }}
     steps:
       - name: Check upstream for changes
         id: check
@@ -33,12 +34,18 @@ jobs:
             echo "should_build=true" >> $GITHUB_OUTPUT
           fi
 
+          SPIGOT_VER=$(curl -fsSL https://raw.githubusercontent.com/mcMMO-Dev/mcMMO/master/pom.xml \
+            | grep -oP '(?<=<spigot\.version>)[^<]+' | head -1)
+          MC_VERSION=$(echo "$SPIGOT_VER" | grep -oP '^\d+\.\d+(\.\d+)?')
+          echo "mc_version=$MC_VERSION" >> $GITHUB_OUTPUT
+
   build:
     needs: check
     if: needs.check.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       - name: Checkout mcMMO
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -65,6 +72,12 @@ jobs:
           SHORT_SHA: ${{ needs.check.outputs.short_sha }}
         run: mv target/mcMMO.jar "target/mcMMO-${VERSION}+${SHORT_SHA}.jar"
 
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plugin-jar
+          path: target/mcMMO-*.jar
+
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -77,3 +90,104 @@ jobs:
             --title "mcMMO ${VERSION} (${SHORT_SHA})" \
             --notes "Built from upstream master @ \`${SHA}\`" \
             target/mcMMO-*.jar
+
+  paper-smoke-test:
+    name: Paper Smoke Test
+    runs-on: ubuntu-latest
+    needs: [check, build]
+    permissions:
+      actions: write
+    steps:
+      - name: Set up JDK 21
+        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Download built JAR
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: plugin-jar
+          path: plugin-jar/
+
+      - name: Resolve Paper build
+        id: paper
+        env:
+          MC_VERSION: ${{ needs.check.outputs.mc_version }}
+        run: |
+          set -euo pipefail
+          UA="mcmmo-builds-CI/1.0 (https://github.com/dubsector/mcmmo-builds)"
+          BUILDS=$(curl -fsSL -H "User-Agent: ${UA}" \
+            "https://fill.papermc.io/v3/projects/paper/versions/${MC_VERSION}/builds" 2>/dev/null || echo "[]")
+          BUILD_COUNT=$(echo "$BUILDS" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
+          if [ "$BUILD_COUNT" = "0" ]; then
+            echo "::warning::No Paper ${MC_VERSION} builds available - smoke test skipped"
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Found ${BUILD_COUNT} Paper ${MC_VERSION} build(s)"
+          echo "$BUILDS" | python3 -c "
+          import sys, json
+          builds = json.load(sys.stdin)
+          stable = [b for b in builds if b.get('channel','').upper() == 'STABLE']
+          chosen = sorted((stable or builds), key=lambda b: b['id'])[-1]
+          d = chosen['downloads']['server:default']
+          sys.stdout.write('build=' + str(chosen['id']) + chr(10))
+          sys.stdout.write('jar_name=' + d['name'] + chr(10))
+          sys.stdout.write('download_url=' + d['url'] + chr(10))
+          " >> "$GITHUB_OUTPUT"
+          echo "available=true" >> "$GITHUB_OUTPUT"
+
+      - name: Download Paper server JAR
+        if: steps.paper.outputs.available == 'true'
+        env:
+          DOWNLOAD_URL: ${{ steps.paper.outputs.download_url }}
+        run: |
+          mkdir -p smoke-server/plugins
+          curl -fsSL \
+            -H "User-Agent: mcmmo-builds-CI/1.0 (https://github.com/dubsector/mcmmo-builds)" \
+            "${DOWNLOAD_URL}" \
+            -o smoke-server/paper.jar
+
+      - name: Copy plugin JAR
+        if: steps.paper.outputs.available == 'true'
+        run: cp plugin-jar/mcMMO-*.jar smoke-server/plugins/mcMMO.jar
+
+      - name: Accept EULA
+        if: steps.paper.outputs.available == 'true'
+        run: echo "eula=true" > smoke-server/eula.txt
+
+      - name: Start Paper server and verify plugin loads
+        if: steps.paper.outputs.available == 'true'
+        timeout-minutes: 3
+        run: |
+          cd smoke-server
+          java -Xmx512m -jar paper.jar --nogui > server.log 2>&1 &
+          SERVER_PID=$!
+          for i in $(seq 1 60); do
+            sleep 2
+            if grep -q "Done" server.log 2>/dev/null; then
+              echo "Server ready"
+              break
+            fi
+          done
+          kill $SERVER_PID 2>/dev/null || true
+          wait $SERVER_PID 2>/dev/null || true
+          if ! grep -q "Done" server.log; then
+            cat server.log
+            echo "::error::Server did not reach ready state"
+            exit 1
+          fi
+          if grep -qi "error\|exception\|failed to load\|Could not load" server.log; then
+            grep -i "error\|exception\|failed to load\|Could not load" server.log
+            echo "::error::Plugin errors detected in server log"
+            exit 1
+          fi
+          echo "Smoke test passed"
+
+      - name: Upload server log on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: smoke-server-log
+          path: smoke-server/server.log
