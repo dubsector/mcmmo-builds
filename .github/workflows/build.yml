@@ -304,12 +304,37 @@ jobs:
     permissions:
       contents: write
       actions: read
+      attestations: write
+      id-token: write
     steps:
       - name: Download plugin artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: plugin-jar
           path: plugin-jar/
+
+      - name: Attest build provenance
+        id: attest
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: plugin-jar/mcMMO-*.jar
+
+      - name: Copy provenance bundle for release
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          JAR=$(ls plugin-jar/mcMMO-*.jar | head -1)
+          cp "$BUNDLE_PATH" "${JAR}.intoto.jsonl"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign JAR
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          JAR=$(ls plugin-jar/mcMMO-*.jar)
+          cosign sign-blob --yes --bundle "${JAR}.sigstore.json" "$JAR"
 
       - name: Publish release
         env:
@@ -321,11 +346,13 @@ jobs:
           LATEST_PAPER: ${{ needs.check.outputs.latest_paper }}
           LATEST_FOLIA: ${{ needs.check.outputs.latest_folia }}
         run: |
-          printf 'Built from upstream master @ [%s](https://github.com/mcMMO-Dev/mcMMO/commit/%s)\n\n| Platform | Compatible versions |\n|----------|---------------------|\n| Paper | %s – %s |\n| Folia | %s – %s |\n' \
+          printf 'Built from upstream master @ [%s](https://github.com/mcMMO-Dev/mcMMO/commit/%s)\n\n| Platform | Compatible versions |\n|----------|---------------------|\n| Paper | %s – %s |\n| Folia | %s – %s |\n\n**Verify the JAR:**\n```sh\ngh attestation verify mcMMO-${VERSION}+${SHORT_SHA}.jar --repo ${{ github.repository }}\n```\n' \
             "$SHORT_SHA" "$SHA" "$MC_VERSION" "$LATEST_PAPER" "$MC_VERSION" "$LATEST_FOLIA" > release-notes.md
 
           gh release create "build-${SHORT_SHA}" \
             --repo ${{ github.repository }} \
             --title "mcMMO ${VERSION} (${SHORT_SHA})" \
             --notes-file release-notes.md \
-            plugin-jar/mcMMO-*.jar
+            plugin-jar/mcMMO-*.jar \
+            plugin-jar/mcMMO-*.jar.sigstore.json \
+            plugin-jar/mcMMO-*.jar.intoto.jsonl
