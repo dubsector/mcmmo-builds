@@ -1,5 +1,7 @@
 # mcmmo-builds
 
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/dubsector/mcmmo-builds/badge)](https://securityscorecards.dev/viewer/?uri=github.com/dubsector/mcmmo-builds)
+
 Automated daily builds of [mcMMO](https://github.com/mcMMO-Dev/mcMMO) compiled from source.
 
 ## How it works
@@ -11,6 +13,27 @@ Automated daily builds of [mcMMO](https://github.com/mcMMO-Dev/mcMMO) compiled f
 
 Each release is tagged `build-{short_sha}` and includes the compiled `mcMMO-{version}+{sha}.jar`.
 
+## Verifying releases
+
+Every JAR is signed with [Sigstore](https://sigstore.dev) and includes a [SLSA provenance attestation](https://slsa.dev). You can verify before using:
+
+```sh
+# Verify SLSA provenance attestation via GitHub CLI
+gh attestation verify mcMMO-<version>+<sha>.jar --repo dubsector/mcmmo-builds
+
+# Verify cosign bundle
+cosign verify-blob mcMMO-<version>+<sha>.jar \
+  --bundle mcMMO-<version>+<sha>.jar.sigstore.json
+```
+
+Both the `.sigstore.json` bundle and `.intoto.jsonl` provenance file are attached to every release.
+
 ## Security
 
-The workflow is scanned on every push with [zizmor](https://docs.zizmor.sh). You can view the latest report under the **Security → Code scanning** tab of this repo.
+- Workflow YAML is scanned on every push with [zizmor](https://docs.zizmor.sh) — view reports under **Security → Code scanning**
+- All GitHub Actions are pinned to exact commit SHAs
+- Least-privilege permissions on every job (`permissions: {}` at workflow level)
+- Dependencies kept current via [Dependabot](https://docs.github.com/en/code-security/dependabot)
+- Supply chain posture tracked by [OpenSSF Scorecard](https://securityscorecards.dev/viewer/?uri=github.com/dubsector/mcmmo-builds)
+
+To report a security issue see [SECURITY.md](SECURITY.md).
