@@ -336,9 +336,8 @@ jobs:
           JAR=$(ls plugin-jar/mcMMO-*.jar)
           cosign sign-blob --yes --bundle "${JAR}.sigstore.json" "$JAR"
 
-      - name: Publish release
+      - name: Generate release notes
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SHA: ${{ needs.check.outputs.sha }}
           SHORT_SHA: ${{ needs.check.outputs.short_sha }}
           VERSION: ${{ needs.build.outputs.version }}
@@ -349,10 +348,15 @@ jobs:
           printf 'Built from upstream master @ [%s](https://github.com/mcMMO-Dev/mcMMO/commit/%s)\n\n| Platform | Compatible versions |\n|----------|---------------------|\n| Paper | %s – %s |\n| Folia | %s – %s |\n\n**Verify the JAR:**\n```sh\ngh attestation verify mcMMO-${VERSION}+${SHORT_SHA}.jar --repo ${{ github.repository }}\n```\n' \
             "$SHORT_SHA" "$SHA" "$MC_VERSION" "$LATEST_PAPER" "$MC_VERSION" "$LATEST_FOLIA" > release-notes.md
 
-          gh release create "build-${SHORT_SHA}" \
-            --repo ${{ github.repository }} \
-            --title "mcMMO ${VERSION} (${SHORT_SHA})" \
-            --notes-file release-notes.md \
-            plugin-jar/mcMMO-*.jar \
-            plugin-jar/mcMMO-*.jar.sigstore.json \
+      - name: Publish release
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1 # zizmor: ignore[superfluous-actions]
+        with:
+          tag_name: build-${{ needs.check.outputs.short_sha }}
+          name: mcMMO ${{ needs.build.outputs.version }} (${{ needs.check.outputs.short_sha }})
+          body_path: release-notes.md
+          files: |
+            plugin-jar/mcMMO-*.jar
+            plugin-jar/mcMMO-*.jar.sigstore.json
             plugin-jar/mcMMO-*.jar.intoto.jsonl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
