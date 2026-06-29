@@ -1,6 +1,10 @@
 # mcmmo-builds
 
+[![Build](https://github.com/dubsector/mcmmo-builds/actions/workflows/build.yml/badge.svg)](https://github.com/dubsector/mcmmo-builds/actions/workflows/build.yml)
+[![Zizmor](https://github.com/dubsector/mcmmo-builds/actions/workflows/zizmor.yml/badge.svg)](https://github.com/dubsector/mcmmo-builds/actions/workflows/zizmor.yml)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/dubsector/mcmmo-builds/badge)](https://securityscorecards.dev/viewer/?uri=github.com/dubsector/mcmmo-builds)
+[![Security Policy](https://img.shields.io/badge/Security-Policy-green)](SECURITY.md)
+[![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot)](https://github.com/dubsector/mcmmo-builds/network/updates)
 
 Automated daily builds of [mcMMO](https://github.com/mcMMO-Dev/mcMMO) compiled from source.
 
@@ -22,8 +26,7 @@ Every JAR is signed with [Sigstore](https://sigstore.dev) and includes a [SLSA p
 gh attestation verify mcMMO-<version>+<sha>.jar --repo dubsector/mcmmo-builds
 
 # Verify cosign bundle
-cosign verify-blob mcMMO-<version>+<sha>.jar \
-  --bundle mcMMO-<version>+<sha>.jar.sigstore.json
+cosign verify-blob mcMMO-<version>+<sha>.jar   --bundle mcMMO-<version>+<sha>.jar.sigstore.json
 ```
 
 Both the `.sigstore.json` bundle and `.intoto.jsonl` provenance file are attached to every release.
