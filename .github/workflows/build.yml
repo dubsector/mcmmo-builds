@@ -348,6 +348,8 @@ jobs:
       - name: Publish to GitHub Packages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHORT_SHA: ${{ needs.check.outputs.short_sha }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
           cat > /tmp/settings.xml <<'XML'
           <settings>
@@ -361,9 +363,11 @@ jobs:
           </settings>
           XML
           JAR=$(ls plugin-jar/mcMMO-*.jar)
+          DEPLOY_VERSION="${VERSION%-SNAPSHOT}-${SHORT_SHA}"
           mvn deploy:deploy-file \
             -Dfile="$JAR" \
             -DpomFile=plugin-jar/pom.xml \
+            -Dversion="$DEPLOY_VERSION" \
             -DrepositoryId=github \
             -Durl=https://maven.pkg.github.com/${{ github.repository }} \
             -s /tmp/settings.xml \
