@@ -94,6 +94,12 @@ jobs:
           name: plugin-jar
           path: target/mcMMO-*.jar
 
+      - name: Upload pom.xml
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: pom-xml
+          path: pom.xml
+
   paper-smoke-test:
     name: Paper Smoke Test
     runs-on: ubuntu-latest
@@ -326,6 +332,42 @@ jobs:
         with:
           name: plugin-jar
           path: plugin-jar/
+
+      - name: Download pom.xml
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: pom-xml
+          path: plugin-jar/
+
+      - name: Set up JDK
+        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Publish to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cat > /tmp/settings.xml <<'XML'
+          <settings>
+            <servers>
+              <server>
+                <id>github</id>
+                <username>${env.GITHUB_ACTOR}</username>
+                <password>${env.GITHUB_TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          XML
+          JAR=$(ls plugin-jar/mcMMO-*.jar)
+          mvn deploy:deploy-file \
+            -Dfile="$JAR" \
+            -DpomFile=plugin-jar/pom.xml \
+            -DrepositoryId=github \
+            -Durl=https://maven.pkg.github.com/${{ github.repository }} \
+            -s /tmp/settings.xml \
+            -q
 
       - name: Attest build provenance
         id: attest
