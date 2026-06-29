@@ -40,3 +40,7 @@ Both the `.sigstore.json` bundle and `.intoto.jsonl` provenance file are attache
 - Supply chain posture tracked by [OpenSSF Scorecard](https://securityscorecards.dev/viewer/?uri=github.com/dubsector/mcmmo-builds)
 
 To report a security issue see [SECURITY.md](SECURITY.md).
+
+## License
+
+This repository contains build automation scripts for mcMMO. The compiled binaries distributed here are derived from [mcMMO](https://github.com/mcMMO-Dev/mcMMO), copyright the mcMMO-Dev contributors, and are distributed under the terms of the [GNU General Public License v3](LICENSE).
