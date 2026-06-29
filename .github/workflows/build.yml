@@ -366,12 +366,14 @@ jobs:
           DEPLOY_VERSION="${VERSION%-SNAPSHOT}-${SHORT_SHA}"
           mvn deploy:deploy-file \
             -Dfile="$JAR" \
-            -DpomFile=plugin-jar/pom.xml \
+            -DgroupId=io.github.dubsector \
+            -DartifactId=mcmmo \
             -Dversion="$DEPLOY_VERSION" \
+            -Dpackaging=jar \
             -DrepositoryId=github \
             -Durl=https://maven.pkg.github.com/${{ github.repository }} \
             -s /tmp/settings.xml \
-            -e
+            -q
 
       - name: Attest build provenance
         id: attest
