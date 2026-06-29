@@ -371,7 +371,7 @@ jobs:
             -DrepositoryId=github \
             -Durl=https://maven.pkg.github.com/${{ github.repository }} \
             -s /tmp/settings.xml \
-            -q
+            -e
 
       - name: Attest build provenance
         id: attest
