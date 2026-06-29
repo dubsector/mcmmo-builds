@@ -15,12 +15,12 @@ Every JAR published by this repository is signed with [Sigstore](https://sigstor
 
 **Verify with the GitHub CLI:**
 ```sh
-gh attestation verify mcMMO-<version>.jar --repo dubsector/mcmmo-builds
+gh attestation verify mcMMO-<version>+<sha>.jar --repo dubsector/mcmmo-builds
 ```
 
 **Verify the cosign bundle:**
 ```sh
-cosign verify-blob mcMMO-<version>.jar --bundle mcMMO-<version>.jar.sigstore.json
+cosign verify-blob mcMMO-<version>+<sha>.jar --bundle mcMMO-<version>+<sha>.jar.sigstore.json
 ```
 
 The `.intoto.jsonl` provenance file attached to each release can be inspected to confirm the exact workflow run, commit SHA, and repository that produced the artifact.
