@@ -37,7 +37,8 @@ jobs:
             echo "should_build=true" >> $GITHUB_OUTPUT
           fi
 
-          POM=$(curl -fsSL https://raw.githubusercontent.com/mcMMO-Dev/mcMMO/master/pom.xml | python3 -c "import sys,re; c=sys.stdin.read(); print(re.sub(r'<!--.*?-->','',c,flags=re.DOTALL))")
+          curl -fsSL https://raw.githubusercontent.com/mcMMO-Dev/mcMMO/master/pom.xml -o /tmp/pom.xml
+          POM=$(python3 -c "import re; c=open('/tmp/pom.xml').read(); print(re.sub(r'<!--.*?-->','',c,flags=re.DOTALL))")
 
           MC_VERSION=$(echo "$POM" | python3 -c "import sys,re; c=sys.stdin.read(); m=re.search(r'<spigot\.version>([^<]+)</spigot\.version>',c); v=m.group(1) if m else ''; mc=re.match(r'\d+\.\d+(\.\d+)?',v); print(mc.group(0) if mc else '')")
           echo "mc_version=$MC_VERSION" >> $GITHUB_OUTPUT
@@ -45,10 +46,12 @@ jobs:
           JAVA_VERSION=$(echo "$POM" | python3 -c "import sys,re; c=sys.stdin.read(); m=re.search(r'<java\.version>([^<]+)</java\.version>',c); print(m.group(1).strip() if m else '17')")
           echo "java_version=$JAVA_VERSION" >> $GITHUB_OUTPUT
 
-          LATEST_PAPER=$(curl -fsSL "https://api.papermc.io/v2/projects/paper" | python3 -c "import sys,json; vs=json.load(sys.stdin)['versions']; print(vs[-1])")
+          curl -fsSL "https://api.papermc.io/v2/projects/paper" -o /tmp/paper-versions.json
+          LATEST_PAPER=$(python3 -c "import json; vs=json.load(open('/tmp/paper-versions.json'))['versions']; print(vs[-1])")
           echo "latest_paper=$LATEST_PAPER" >> $GITHUB_OUTPUT
 
-          LATEST_FOLIA=$(curl -fsSL "https://api.papermc.io/v2/projects/folia" | python3 -c "import sys,json; vs=json.load(sys.stdin)['versions']; print(vs[-1])")
+          curl -fsSL "https://api.papermc.io/v2/projects/folia" -o /tmp/folia-versions.json
+          LATEST_FOLIA=$(python3 -c "import json; vs=json.load(open('/tmp/folia-versions.json'))['versions']; print(vs[-1])")
           echo "latest_folia=$LATEST_FOLIA" >> $GITHUB_OUTPUT
 
   build:
@@ -107,9 +110,14 @@ jobs:
       - name: Resolve latest Paper build
         id: paper
         run: |
-          MC_VERSION=$(curl -fsSL "https://api.papermc.io/v2/projects/paper" | python3 -c "import sys,json; vs=json.load(sys.stdin)['versions']; print(vs[-1])")
-          BUILD=$(curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds" | python3 -c "import sys,json; builds=json.load(sys.stdin)['builds']; stable=[b for b in builds if b.get('channel','')=='default']; chosen=(stable or builds)[-1]; print(chosen['build'])")
-          JAR_NAME=$(curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds/${BUILD}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['downloads']['application']['name'])")
+          curl -fsSL "https://api.papermc.io/v2/projects/paper" -o /tmp/paper-versions.json
+          MC_VERSION=$(python3 -c "import json; vs=json.load(open('/tmp/paper-versions.json'))['versions']; print(vs[-1])")
+
+          curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds" -o /tmp/paper-builds.json
+          BUILD=$(python3 -c "import json; builds=json.load(open('/tmp/paper-builds.json'))['builds']; stable=[b for b in builds if b.get('channel','')=='default']; chosen=(stable or builds)[-1]; print(chosen['build'])")
+
+          curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds/${BUILD}" -o /tmp/paper-build.json
+          JAR_NAME=$(python3 -c "import json; d=json.load(open('/tmp/paper-build.json')); print(d['downloads']['application']['name'])")
           echo "mc_version=${MC_VERSION}" >> "$GITHUB_OUTPUT"
           echo "build=${BUILD}"           >> "$GITHUB_OUTPUT"
           echo "jar_name=${JAR_NAME}"     >> "$GITHUB_OUTPUT"
@@ -210,9 +218,14 @@ jobs:
       - name: Resolve latest Folia build
         id: folia
         run: |
-          MC_VERSION=$(curl -fsSL "https://api.papermc.io/v2/projects/folia" | python3 -c "import sys,json; vs=json.load(sys.stdin)['versions']; print(vs[-1])")
-          BUILD=$(curl -fsSL "https://api.papermc.io/v2/projects/folia/versions/${MC_VERSION}/builds" | python3 -c "import sys,json; builds=json.load(sys.stdin)['builds']; stable=[b for b in builds if b.get('channel','')=='default']; chosen=(stable or builds)[-1]; print(chosen['build'])")
-          JAR_NAME=$(curl -fsSL "https://api.papermc.io/v2/projects/folia/versions/${MC_VERSION}/builds/${BUILD}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['downloads']['application']['name'])")
+          curl -fsSL "https://api.papermc.io/v2/projects/folia" -o /tmp/folia-versions.json
+          MC_VERSION=$(python3 -c "import json; vs=json.load(open('/tmp/folia-versions.json'))['versions']; print(vs[-1])")
+
+          curl -fsSL "https://api.papermc.io/v2/projects/folia/versions/${MC_VERSION}/builds" -o /tmp/folia-builds.json
+          BUILD=$(python3 -c "import json; builds=json.load(open('/tmp/folia-builds.json'))['builds']; stable=[b for b in builds if b.get('channel','')=='default']; chosen=(stable or builds)[-1]; print(chosen['build'])")
+
+          curl -fsSL "https://api.papermc.io/v2/projects/folia/versions/${MC_VERSION}/builds/${BUILD}" -o /tmp/folia-build.json
+          JAR_NAME=$(python3 -c "import json; d=json.load(open('/tmp/folia-build.json')); print(d['downloads']['application']['name'])")
           echo "mc_version=${MC_VERSION}" >> "$GITHUB_OUTPUT"
           echo "build=${BUILD}"           >> "$GITHUB_OUTPUT"
           echo "jar_name=${JAR_NAME}"     >> "$GITHUB_OUTPUT"
