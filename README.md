@@ -8,7 +8,7 @@
 
 Automated daily builds of [mcMMO](https://github.com/mcMMO-Dev/mcMMO) compiled from source.
 
-**Download:** https://dubsector.github.io/mcmmo-builds/
+**Download page:** https://dubsector.github.io/mcmmo-builds/
 
 ## How it works
 
