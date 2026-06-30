@@ -407,8 +407,9 @@ jobs:
           LATEST_PAPER: ${{ needs.check.outputs.latest_paper }}
           LATEST_FOLIA: ${{ needs.check.outputs.latest_folia }}
         run: |
-          printf 'Built from upstream master @ [%s](https://github.com/mcMMO-Dev/mcMMO/commit/%s)\n\n| Platform | Compatible versions |\n|----------|---------------------|\n| Paper | %s – %s |\n| Folia | %s – %s |\n\n**Verify the JAR:**\n```sh\ngh attestation verify mcMMO-${VERSION}+${SHORT_SHA}.jar --repo ${{ github.repository }}\n```\n' \
-            "$SHORT_SHA" "$SHA" "$MC_VERSION" "$LATEST_PAPER" "$MC_VERSION" "$LATEST_FOLIA" > release-notes.md
+          JAR_NAME="mcMMO-${VERSION}+${SHORT_SHA}.jar"
+          printf 'Built from upstream master @ [%s](https://github.com/mcMMO-Dev/mcMMO/commit/%s)\n\n| Platform | Compatible versions |\n|----------|---------------------|\n| Paper | %s – %s |\n| Folia | %s – %s |\n\n**Verify the JAR:**\n```sh\ngh attestation verify %s --repo ${{ github.repository }}\n\ncosign verify-blob %s \\\n  --bundle %s.sigstore.json\n```\n' \
+            "$SHORT_SHA" "$SHA" "$MC_VERSION" "$LATEST_PAPER" "$MC_VERSION" "$LATEST_FOLIA" "$JAR_NAME" "$JAR_NAME" "$JAR_NAME" > release-notes.md
 
       - name: Publish release
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1 # zizmor: ignore[superfluous-actions]
