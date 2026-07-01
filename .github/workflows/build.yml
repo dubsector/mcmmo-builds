@@ -18,8 +18,6 @@ jobs:
       short_sha: ${{ steps.check.outputs.short_sha }}
       mc_version: ${{ steps.check.outputs.mc_version }}
       java_version: ${{ steps.check.outputs.java_version }}
-      latest_paper: ${{ steps.check.outputs.latest_paper }}
-      latest_folia: ${{ steps.check.outputs.latest_folia }}
     steps:
       - name: Check upstream for changes
         id: check
@@ -45,14 +43,6 @@ jobs:
 
           JAVA_VERSION=$(echo "$POM" | python3 -c "import sys,re; c=sys.stdin.read(); m=re.search(r'<java\.version>([^<]+)</java\.version>',c); print(m.group(1).strip() if m else '17')")
           echo "java_version=$JAVA_VERSION" >> $GITHUB_OUTPUT
-
-          curl -fsSL "https://fill.papermc.io/v3/projects/paper" -o /tmp/paper-versions.json
-          LATEST_PAPER=$(python3 -c "import json; vs=json.load(open('/tmp/paper-versions.json'))['versions']; k=next(iter(vs)); print(vs[k][0])")
-          echo "latest_paper=$LATEST_PAPER" >> $GITHUB_OUTPUT
-
-          curl -fsSL "https://fill.papermc.io/v3/projects/folia" -o /tmp/folia-versions.json
-          LATEST_FOLIA=$(python3 -c "import json; vs=json.load(open('/tmp/folia-versions.json'))['versions']; k=next(iter(vs)); print(vs[k][0])")
-          echo "latest_folia=$LATEST_FOLIA" >> $GITHUB_OUTPUT
 
   build:
     needs: check
@@ -106,6 +96,8 @@ jobs:
     needs: [check, build]
     permissions:
       actions: write
+    outputs:
+      mc_version: ${{ steps.paper.outputs.mc_version }}
     steps:
       - name: Download built JAR
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -212,6 +204,8 @@ jobs:
     needs: [check, build]
     permissions:
       actions: write
+    outputs:
+      mc_version: ${{ steps.folia.outputs.mc_version }}
     steps:
       - name: Download built JAR
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -400,8 +394,8 @@ jobs:
           SHORT_SHA: ${{ needs.check.outputs.short_sha }}
           VERSION: ${{ needs.build.outputs.version }}
           MC_VERSION: ${{ needs.check.outputs.mc_version }}
-          LATEST_PAPER: ${{ needs.check.outputs.latest_paper }}
-          LATEST_FOLIA: ${{ needs.check.outputs.latest_folia }}
+          LATEST_PAPER: ${{ needs.paper-smoke-test.outputs.mc_version }}
+          LATEST_FOLIA: ${{ needs.folia-smoke-test.outputs.mc_version }}
         run: |
           JAR_NAME="mcMMO-${VERSION}+${SHORT_SHA}.jar"
           printf 'Built from upstream master @ [%s](https://github.com/mcMMO-Dev/mcMMO/commit/%s)\n\n| Platform | Compatible versions |\n|----------|---------------------|\n| Paper | %s – %s |\n| Folia | %s – %s |\n\n**Verify the JAR:**\n```sh\ngh attestation verify %s --repo ${{ github.repository }}\n\ncosign verify-blob %s \\\n  --bundle %s.sigstore.json\n```\n' \
