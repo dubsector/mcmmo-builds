@@ -147,6 +147,18 @@
     .changelog-list { margin: 0; padding: 0.75rem 1rem 0.75rem 1.75rem; font-size: 13px; line-height: 1.6; }
     .changelog-list li { margin-bottom: 0.25rem; }
     .changelog-list li:last-child { margin-bottom: 0; }
+    .changelog-toggle {
+      display: block; width: 100%;
+      background: none; border: none; border-top: 1px solid var(--border);
+      cursor: pointer;
+      padding: 0.5rem 1rem;
+      font-family: inherit;
+      font-size: 12.5px; font-weight: 500;
+      color: var(--accent);
+      text-align: left;
+    }
+    .changelog-toggle:hover { text-decoration: underline; }
+    .changelog-toggle[hidden] { display: none; }
 
     .verify-block { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
     .verify-header {
@@ -323,6 +335,25 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+const CHANGELOG_VISIBLE = 4;
+
+function renderChangelog(items) {
+  const visible = items.slice(0, CHANGELOG_VISIBLE);
+  const rest = items.slice(CHANGELOG_VISIBLE);
+
+  return `
+    <div class="changelog-block">
+      <div class="changelog-header">Changelog</div>
+      <ul class="changelog-list">
+        ${visible.map(i => `<li>${escapeHtml(i)}</li>`).join('')}
+        ${rest.map(i => `<li class="changelog-extra" hidden>${escapeHtml(i)}</li>`).join('')}
+      </ul>
+      ${rest.length ? `
+      <button type="button" class="changelog-toggle changelog-show">Show ${rest.length} more change${rest.length > 1 ? 's' : ''}</button>
+      <button type="button" class="changelog-toggle changelog-hide" hidden>Hide</button>` : ''}
+    </div>`;
+}
+
 function shieldIcon() {
   return `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
     <path d="M8 1.5L2 4v4c0 3.3 2.5 5.5 6 6.5 3.5-1 6-3.2 6-6.5V4L8 1.5z"/>
@@ -367,15 +398,11 @@ function renderLatest(r) {
         </div>
       </div>
       <div class="card-actions">
-        ${changelog.length ? `
-        <div class="changelog-block">
-          <div class="changelog-header">Changelog</div>
-          <ul class="changelog-list">${changelog.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
-        </div>` : ''}
         <a class="btn-download" href="${jarUrl}" download>
           ${dlIcon()}
           Download ${jarName}
         </a>
+        ${changelog.length ? renderChangelog(changelog) : ''}
         <div class="verify-block">
           <div class="verify-header">${shieldIcon()} Verify before installing</div>
           <div class="verify-cmd">gh attestation verify ${jarName} --repo ${REPO}
@@ -415,6 +442,16 @@ function renderHistory(releases) {
       </table>
     </div>`;
 }
+
+document.getElementById('app').addEventListener('click', e => {
+  const btn = e.target.closest('.changelog-toggle');
+  if (!btn) return;
+  const block = btn.closest('.changelog-block');
+  const expand = btn.classList.contains('changelog-show');
+  block.querySelectorAll('.changelog-extra').forEach(li => { li.hidden = !expand; });
+  block.querySelector('.changelog-show').hidden = expand;
+  block.querySelector('.changelog-hide').hidden = !expand;
+});
 
 fetch(`https://api.github.com/repos/${REPO}`)
   .then(r => r.json())
