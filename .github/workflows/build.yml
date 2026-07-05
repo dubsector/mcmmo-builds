@@ -16,6 +16,7 @@ jobs:
       should_build: ${{ steps.check.outputs.should_build }}
       sha: ${{ steps.check.outputs.sha }}
       short_sha: ${{ steps.check.outputs.short_sha }}
+      prev_sha: ${{ steps.check.outputs.prev_sha }}
       mc_version: ${{ steps.check.outputs.mc_version }}
       java_version: ${{ steps.check.outputs.java_version }}
     steps:
@@ -34,6 +35,9 @@ jobs:
           else
             echo "should_build=true" >> $GITHUB_OUTPUT
           fi
+
+          PREV_TAG=$(gh release list --repo ${{ github.repository }} --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || true)
+          echo "prev_sha=${PREV_TAG#build-}" >> $GITHUB_OUTPUT
 
           curl -fsSL https://raw.githubusercontent.com/mcMMO-Dev/mcMMO/master/pom.xml -o /tmp/pom.xml
           POM=$(python3 -c "import re; c=open('/tmp/pom.xml').read(); print(re.sub(r'<!--.*?-->','',c,flags=re.DOTALL))")
@@ -380,14 +384,38 @@ jobs:
         env:
           SHA: ${{ needs.check.outputs.sha }}
           SHORT_SHA: ${{ needs.check.outputs.short_sha }}
+          PREV_SHA: ${{ needs.check.outputs.prev_sha }}
           VERSION: ${{ needs.build.outputs.version }}
           MC_VERSION: ${{ needs.check.outputs.mc_version }}
           LATEST_PAPER: ${{ needs.paper-smoke-test.outputs.mc_version }}
           LATEST_FOLIA: ${{ needs.folia-smoke-test.outputs.mc_version }}
         run: |
           JAR_NAME="mcMMO-${VERSION}+${SHORT_SHA}.jar"
-          printf 'Built from upstream master @ [%s](https://github.com/mcMMO-Dev/mcMMO/commit/%s)\n\n| Platform | Compatible versions |\n|----------|---------------------|\n| Paper | %s – %s |\n| Folia | %s – %s |\n\n**Verify the JAR:**\n```sh\ngh attestation verify %s --repo ${{ github.repository }}\n\ncosign verify-blob %s \\\n  --bundle %s.sigstore.json\n```\n' \
-            "$SHORT_SHA" "$SHA" "$MC_VERSION" "$LATEST_PAPER" "$MC_VERSION" "$LATEST_FOLIA" "$JAR_NAME" "$JAR_NAME" "$JAR_NAME" > release-notes.md
+
+          CHANGELOG=""
+          if [ -n "$PREV_SHA" ]; then
+            curl -fsSL "https://raw.githubusercontent.com/mcMMO-Dev/mcMMO/$PREV_SHA/Changelog.txt" -o /tmp/changelog_old.txt || true
+            touch /tmp/changelog_old.txt
+            curl -fsSL "https://raw.githubusercontent.com/mcMMO-Dev/mcMMO/$SHA/Changelog.txt" -o /tmp/changelog_new.txt || true
+            if [ -s /tmp/changelog_new.txt ]; then
+              CHANGELOG=$(diff -u /tmp/changelog_old.txt /tmp/changelog_new.txt \
+                | grep '^+' | grep -v '^+++' \
+                | sed 's/^+[[:space:]]*//' \
+                | sed '/^$/d' | sed '/^NOTES:$/d' | sed '/^Version [0-9.]\+$/d')
+            fi
+          fi
+
+          {
+            printf 'Built from upstream master @ [%s](https://github.com/mcMMO-Dev/mcMMO/commit/%s)\n\n' "$SHORT_SHA" "$SHA"
+            printf '| Platform | Compatible versions |\n|----------|---------------------|\n| Paper | %s – %s |\n| Folia | %s – %s |\n\n' "$MC_VERSION" "$LATEST_PAPER" "$MC_VERSION" "$LATEST_FOLIA"
+            if [ -n "$CHANGELOG" ]; then
+              printf '**Changelog:**\n'
+              echo "$CHANGELOG" | sed 's/^/- /'
+              printf '\n'
+            fi
+            printf '**Verify the JAR:**\n```sh\ngh attestation verify %s --repo ${{ github.repository }}\n\ncosign verify-blob %s \\\n  --bundle %s.sigstore.json\n```\n' \
+              "$JAR_NAME" "$JAR_NAME" "$JAR_NAME"
+          } > release-notes.md
 
       - name: Publish release
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1 # zizmor: ignore[superfluous-actions]
