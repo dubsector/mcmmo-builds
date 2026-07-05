@@ -137,6 +137,17 @@
     .btn-download:hover { opacity: 0.88; text-decoration: none; }
     .btn-download svg { width: 18px; height: 18px; flex-shrink: 0; }
 
+    .changelog-block { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .changelog-header {
+      padding: 0.5rem 1rem;
+      font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .changelog-list { margin: 0; padding: 0.75rem 1rem 0.75rem 1.75rem; font-size: 13px; line-height: 1.6; }
+    .changelog-list li { margin-bottom: 0.25rem; }
+    .changelog-list li:last-child { margin-bottom: 0; }
+
     .verify-block { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
     .verify-header {
       padding: 0.5rem 1rem;
@@ -302,6 +313,16 @@ function getCommitUrl(body) {
   return m ? m[0] : null;
 }
 
+function getChangelog(body) {
+  const m = body && body.match(/\*\*Changelog:\*\*\n([\s\S]*?)\n\n\*\*Verify/);
+  if (!m) return [];
+  return m[1].split('\n').map(l => l.replace(/^-\s*/, '').trim()).filter(Boolean);
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function shieldIcon() {
   return `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
     <path d="M8 1.5L2 4v4c0 3.3 2.5 5.5 6 6.5 3.5-1 6-3.2 6-6.5V4L8 1.5z"/>
@@ -320,6 +341,7 @@ function renderLatest(r) {
   const { version, sha } = parseName(r.name);
   const jar = getJar(r.assets);
   const mcRange = getMcRange(r.body);
+  const changelog = getChangelog(r.body);
   const jarName = jar ? jar.name : `mcMMO-${version}+${sha}.jar`;
   const jarUrl  = jar ? jar.browser_download_url : `https://github.com/${REPO}/releases/tag/${r.tag_name}`;
   const commitUrl = getCommitUrl(r.body) || `https://github.com/mcMMO-Dev/mcMMO/commit/${sha}`;
@@ -345,6 +367,11 @@ function renderLatest(r) {
         </div>
       </div>
       <div class="card-actions">
+        ${changelog.length ? `
+        <div class="changelog-block">
+          <div class="changelog-header">Changelog</div>
+          <ul class="changelog-list">${changelog.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+        </div>` : ''}
         <a class="btn-download" href="${jarUrl}" download>
           ${dlIcon()}
           Download ${jarName}
