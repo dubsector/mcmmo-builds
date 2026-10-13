@@ -83,13 +83,13 @@ jobs:
         run: mv target/mcMMO.jar "target/mcMMO-${VERSION}+${SHORT_SHA}.jar"
 
       - name: Upload plugin artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: plugin-jar
           path: target/mcMMO-*.jar
 
       - name: Upload pom.xml
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pom-xml
           path: pom.xml
@@ -104,7 +104,7 @@ jobs:
       mc_version: ${{ steps.paper.outputs.mc_version }}
     steps:
       - name: Download built JAR
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: plugin-jar
           path: plugin-jar/
@@ -190,7 +190,7 @@ jobs:
 
       - name: Upload server log
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: paper-smoke-log
           path: smoke-server/server.log
@@ -206,7 +206,7 @@ jobs:
       mc_version: ${{ steps.folia.outputs.mc_version }}
     steps:
       - name: Download built JAR
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: plugin-jar
           path: plugin-jar/
@@ -292,7 +292,7 @@ jobs:
 
       - name: Upload server log
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: folia-smoke-log
           path: smoke-server/server.log
@@ -310,13 +310,13 @@ jobs:
       packages: write
     steps:
       - name: Download plugin artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: plugin-jar
           path: plugin-jar/
 
       - name: Download pom.xml
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: pom-xml
           path: plugin-jar/
